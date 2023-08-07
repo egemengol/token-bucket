@@ -1,3 +1,6 @@
+pub mod multi;
 pub mod quota;
 pub mod token_bucket;
-pub mod multi;
+
+pub use strum::IntoEnumIterator;
+pub use strum_macros::EnumIter;
