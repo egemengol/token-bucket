@@ -3,7 +3,6 @@ use std::{collections::HashMap, time::Instant};
 
 use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
-use std::sync::Mutex;
 
 use futures_timer::Delay;
 
@@ -16,23 +15,22 @@ use once_cell::sync::Lazy;
 
 static JITTER_DIST: Lazy<Uniform<u64>> = Lazy::new(|| Uniform::new(0, 10));
 
-pub struct TokenBucketUltimate(Mutex<HashMap<String, TokenBucket>>);
+pub struct TokenBucketUltimate(HashMap<String, TokenBucket>);
 
 impl TokenBucketUltimate {
     pub fn new() -> Self {
-        Self(Mutex::new(HashMap::new()))
+        Self(HashMap::new())
     }
 
     pub fn insert(&mut self, key: String, quota: Quota) {
-        self.0.lock().unwrap().insert(key, TokenBucket::new(quota));
+        self.0.insert(key, TokenBucket::new(quota));
     }
 
     pub fn check_n(&self, pairs: &[(&str, u32)]) -> Result<(), NotUntil> {
-        let buckets = self.0.lock().unwrap();
         pairs
             .iter()
             .map(|&(key, n)| {
-                buckets
+                self.0
                     .get(key)
                     .expect("Do not use a key that is not inserted")
                     .check_n(n)
@@ -41,14 +39,13 @@ impl TokenBucketUltimate {
     }
 
     pub fn try_take_n(&mut self, pairs: &[(&str, u32)]) -> Result<(), NotUntil> {
-        let mut buckets = self.0.lock().unwrap();
-        let mut buckets_new = buckets.clone();
+        let mut buckets_new = self.0.clone();
         let res = pairs
             .iter()
             .try_for_each(|&(key, n)| buckets_new.get_mut(key).unwrap().try_take_n(n));
 
         res.and_then(|_| {
-            *buckets = buckets_new;
+            self.0 = buckets_new;
             Ok(())
         })
     }
@@ -118,5 +115,45 @@ mod tests {
         let mid = Instant::now();
         ultimate.take_n(&[("b", 10)]).await;
         assert!(mid.elapsed() > Duration::from_millis(450));
+    }
+    use futures::executor::block_on;
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use std::thread;
+    use tokio::time::Duration;
+
+    #[tokio::test]
+    async fn test_threaded() {
+        let ultimate = Arc::new(Mutex::new(ultimate()));
+        let num_threads = 3;
+        let num_requests = 2;
+        let request_weight = 10;
+        let mut handles = Vec::new();
+
+        let start = Instant::now();
+        for _ in 0..num_threads {
+            let ultimate = ultimate.clone();
+            let handle = thread::spawn(move || {
+                block_on(async {
+                    for _ in 0..num_requests {
+                        ultimate
+                            .lock()
+                            .unwrap()
+                            .take_n(&[("b", request_weight)])
+                            .await;
+                    }
+                })
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        // b has 20 per second
+        // 3 consumers, tring to consume 10 per second twice
+        // should take around 2 seconds
+        assert!(start.elapsed() > Duration::from_secs(2));
+        assert!(start.elapsed() < Duration::from_secs_f32(2.5));
     }
 }
