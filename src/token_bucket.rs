@@ -2,8 +2,9 @@ use std::time::Instant;
 
 use crate::quota::Quota;
 
-type NotUntil = Instant;
+pub type NotUntil = Instant;
 
+#[derive(Debug, Clone)]
 pub struct TokenBucket {
     quota: Quota,
     tokens: u32,
@@ -18,7 +19,6 @@ impl TokenBucket {
             last_update: Instant::now(),
         }
     }
-
     pub fn check_n(&self, n: u32) -> Result<(), NotUntil> {
         if n <= self.tokens {
             return Ok(());

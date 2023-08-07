@@ -1,5 +1,5 @@
 /// Taken from https://github.com/antifuchs/governor/blob/b7242de31c8d28b49afb28ccf540683dd31b3a22/governor/src/quota.rs
-/// Nanos, depreciated, some docs removed
+/// Nanos, depreciated and some docs removed
 /// Added a utility function
 use std::prelude::v1::*;
 
