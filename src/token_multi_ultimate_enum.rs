@@ -3,6 +3,7 @@ use std::hash::Hash;
 use std::time::Duration;
 use std::{collections::HashMap, time::Instant};
 
+use log::debug;
 use nonzero_ext::nonzero;
 use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
@@ -63,17 +64,14 @@ impl<T: QuotasTrait + IntoEnumIterator + Hash + Eq + Clone> TokenBucketUltimate<
 
     pub async fn take_n(&mut self, pairs: &[(T, u32)]) {
         loop {
-            println!("Looping...");
             match self.try_take_n(pairs) {
                 Ok(_) => return,
                 Err(not_until) => {
                     let jitter = JITTER_DIST.sample(&mut thread_rng());
-                    let jitter_dur = Duration::from_micros(jitter);
-                    println!("not_until: {:?}, now: {:?}", not_until, Instant::now());
-                    let delay = Delay::new(not_until.duration_since(Instant::now()) + jitter_dur);
-                    println!("delay: {:?}", delay);
-                    delay.await;
-                    println!("delay done");
+                    let jitter_dur = Duration::from_millis(jitter);
+                    let delay_dur = not_until.duration_since(Instant::now()) + jitter_dur;
+                    Delay::new(delay_dur).await;
+                    debug!("delay_dur: {:?}", delay_dur);
                 }
             }
         }
@@ -161,7 +159,9 @@ mod tests {
     use std::thread;
     use tokio::time::Duration;
 
-    #[tokio::test]
+    use test_log::test;
+
+    #[test(tokio::test)]
     async fn test_threaded() {
         let ultimate = Arc::new(Mutex::new(ultimate()));
         let num_threads = 3;

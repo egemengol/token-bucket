@@ -52,17 +52,13 @@ impl TokenBucketUltimate {
 
     pub async fn take_n(&mut self, pairs: &[(&str, u32)]) {
         loop {
-            println!("Looping...");
             match self.try_take_n(pairs) {
                 Ok(_) => return,
                 Err(not_until) => {
                     let jitter = JITTER_DIST.sample(&mut thread_rng());
                     let jitter_dur = Duration::from_micros(jitter);
-                    println!("not_until: {:?}, now: {:?}", not_until, Instant::now());
                     let delay = Delay::new(not_until.duration_since(Instant::now()) + jitter_dur);
-                    println!("delay: {:?}", delay);
                     delay.await;
-                    println!("delay done");
                 }
             }
         }
