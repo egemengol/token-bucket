@@ -78,8 +78,9 @@ mod tests {
     use std::sync::Mutex;
     use std::thread;
     use tokio::time::Duration;
-
     use test_log::test;
+    use strum_macros::EnumIter;
+    
 
     use super::*;
 

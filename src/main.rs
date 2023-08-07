@@ -1,4 +1,3 @@
-// #[macro_use]
 extern crate log;
 use std::{
     sync::{Arc, Mutex},
@@ -7,19 +6,16 @@ use std::{
 };
 
 use futures::executor::block_on;
-use log::warn;
 use nonzero_ext::nonzero;
 use strum_macros::EnumIter;
-use token_bucket::{
-    quota::Quota, token_multi_ultimate_enum::QuotasTrait,
-    token_multi_ultimate_enum::TokenBucketUltimate,
-};
+use token_bucket::{multi::QuotasTrait, multi::TokenBucketUltimate, quota::Quota};
 
 #[derive(EnumIter, Hash, Eq, PartialEq, Clone, Copy, Debug)]
 pub enum Quotas {
     Ten,
     Twenty,
 }
+
 impl QuotasTrait for Quotas {
     fn get_quota(&self) -> Quota {
         match self {
