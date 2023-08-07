@@ -1,26 +1,18 @@
-#![allow(unused_imports)]
-use std::hash::Hash;
-use std::time::Duration;
-use std::{collections::HashMap, time::Instant};
-
-use log::debug;
-use nonzero_ext::nonzero;
-use rand::distributions::{Distribution, Uniform};
-use rand::thread_rng;
-
-use futures_timer::Delay;
-
 use crate::{
     quota::Quota,
     token_bucket::{NotUntil, TokenBucket},
 };
-
+use futures_timer::Delay;
+use log::debug;
 use once_cell::sync::Lazy;
+use rand::distributions::{Distribution, Uniform};
+use rand::thread_rng;
+use std::hash::Hash;
+use std::time::Duration;
+use std::{collections::HashMap, time::Instant};
+use strum::IntoEnumIterator;
 
 static JITTER_DIST: Lazy<Uniform<u64>> = Lazy::new(|| Uniform::new(0, 10));
-
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
 pub trait QuotasTrait {
     fn get_quota(&self) -> Quota;
@@ -80,7 +72,14 @@ impl<T: QuotasTrait + IntoEnumIterator + Hash + Eq + Clone> TokenBucketUltimate<
 
 #[cfg(test)]
 mod tests {
+    use futures::executor::block_on;
     use nonzero_ext::nonzero;
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use std::thread;
+    use tokio::time::Duration;
+
+    use test_log::test;
 
     use super::*;
 
@@ -153,13 +152,6 @@ mod tests {
         ultimate.take_n(&[(Quotas::Twenty, 10)]).await;
         assert!(mid.elapsed() > Duration::from_millis(450));
     }
-    use futures::executor::block_on;
-    use std::sync::Arc;
-    use std::sync::Mutex;
-    use std::thread;
-    use tokio::time::Duration;
-
-    use test_log::test;
 
     #[test(tokio::test)]
     async fn test_threaded() {
