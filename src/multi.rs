@@ -18,6 +18,7 @@ pub trait QuotasTrait {
     fn get_quota(&self) -> Quota;
 }
 
+#[derive(Debug, Clone)]
 pub struct TokenBucketUltimate<T: QuotasTrait + IntoEnumIterator>(HashMap<T, TokenBucket>);
 
 impl<T: QuotasTrait + IntoEnumIterator + Hash + Eq + Clone> TokenBucketUltimate<T> {
@@ -153,11 +154,25 @@ mod tests {
         assert!(mid.elapsed() > Duration::from_millis(450));
     }
 
+    #[tokio::test]
+    async fn test_empty() {
+        let mut ultimate = TokenBucketUltimate::<Quotas>::new();
+        assert_eq!(ultimate.check_n(&[(Quotas::Ten, 10)]), Ok(()));
+        let start = Instant::now();
+        ultimate.take_n(&[(Quotas::Ten, 10)]).await;
+        assert!(start.elapsed() < Duration::from_millis(1));
+
+        assert!(ultimate.check_n(&[(Quotas::Ten, 1)]).is_err());
+        let start = Instant::now();
+        ultimate.take_n(&[(Quotas::Ten, 1)]).await;
+        assert!(start.elapsed() > Duration::from_millis(100));
+    }
+
     #[test(tokio::test)]
     async fn test_threaded() {
         let ultimate = Arc::new(Mutex::new(ultimate()));
         let num_threads = 3;
-        let num_requests = 2;
+        let num_requests = 5;
         let request_weight = 10;
         let mut handles = Vec::new();
 
@@ -182,9 +197,13 @@ mod tests {
             handle.join().unwrap();
         }
         // b has 20 per second
-        // 3 consumers, tring to consume 10 per second twice
-        // should take around 2 seconds
-        assert!(start.elapsed() > Duration::from_secs(2));
-        assert!(start.elapsed() < Duration::from_secs_f32(2.5));
+        // 3 consumers, tring to consume 10 per second five times
+        // should take around 6.5 seconds
+        assert!(start.elapsed() > Duration::from_secs_f32(6.4));
+        assert!(
+            start.elapsed() < Duration::from_secs_f32(6.8),
+            "{:?}",
+            start.elapsed()
+        );
     }
 }

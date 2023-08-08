@@ -1,5 +1,7 @@
 use std::time::Instant;
 
+use log::debug;
+
 use crate::quota::Quota;
 
 pub type NotUntil = Instant;
@@ -15,7 +17,7 @@ impl TokenBucket {
     pub fn new(quota: Quota) -> Self {
         Self {
             quota,
-            tokens: quota.burst_size().get(),
+            tokens: quota.max_burst.get(),
             last_update: Instant::now(),
         }
     }
@@ -35,9 +37,15 @@ impl TokenBucket {
     pub fn try_take_n(&mut self, n: u32) -> Result<(), NotUntil> {
         let earned_tokens = (self.last_update.elapsed().as_micros()
             / self.quota.replenish_1_per.as_micros()) as u32;
+        debug!(
+            "earned_tokens: {} for quota: {:?} in duration: {:?}",
+            earned_tokens,
+            self.quota,
+            self.last_update.elapsed()
+        );
         self.tokens = std::cmp::min(self.tokens + earned_tokens, self.quota.max_burst.get());
+        debug!("tokens: {}", self.tokens);
         self.last_update = Instant::now();
-
         self.check_n(n).and_then(|_| {
             self.tokens -= n;
             Ok(())
@@ -72,5 +80,14 @@ mod test {
         assert_eq!(bucket.try_take_n(0), Ok(()));
         assert_eq!(bucket.check_n(0), Ok(()));
         assert_eq!(bucket.try_take_n(0), Ok(()));
+    }
+
+    #[test]
+    fn empty_test() {
+        let mut bucket = TokenBucket::new(Quota::per_second(nonzero!(2u32)));
+        assert_eq!(bucket.check_n(2), Ok(()));
+        assert_eq!(bucket.try_take_n(2), Ok(()));
+        assert_eq!(bucket.tokens, 0);
+        assert!(bucket.check_n(1).is_err());
     }
 }
