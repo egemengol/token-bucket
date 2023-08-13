@@ -17,7 +17,7 @@ impl TokenBucket {
     pub fn new(quota: Quota) -> Self {
         Self {
             quota,
-            tokens: quota.max_burst.get(),
+            tokens: 0,
             last_update: Instant::now(),
         }
     }
